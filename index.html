@@ -1,113 +1,160 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reset PWA</title>
-  <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#007bff">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RESET.</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#000000" />
+
   <style>
-    * {
+    body {
       margin: 0;
-      padding: 0;
+      background: #000;
+      color: #fff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      text-align: center;
+    }
+    .screen {
+      display: none;
+      padding: 24px;
+      width: 100%;
+      max-width: 420px;
       box-sizing: border-box;
     }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
+    .screen.active { display: block; }
+
+    .lead {
+      font-size: 18px;
+      line-height: 1.5;
+      margin: 0 0 18px 0;
+      opacity: 0.95;
     }
-    .container {
-      text-align: center;
-      padding: 2rem;
-      background: rgba(0,0,0,0.2);
-      border-radius: 20px;
-    }
-    h1 {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
-    }
-    p {
-      font-size: 1.1rem;
-      margin-bottom: 2rem;
-      opacity: 0.9;
-    }
+
     button {
-      background: #fff;
-      color: #667eea;
-      border: none;
-      padding: 1rem 2rem;
-      font-size: 1rem;
-      border-radius: 50px;
+      width: 100%;
+      padding: 16px;
+      margin-top: 12px;
+      background: #111;
+      color: #fff;
+      border: 1px solid #333;
+      font-size: 16px;
+      border-radius: 10px;
       cursor: pointer;
-      font-weight: bold;
-      transition: transform 0.2s;
     }
-    button:hover {
-      transform: scale(1.05);
-    }
-    button:active {
-      transform: scale(0.95);
-    }
-    .status {
-      margin-top: 2rem;
-      font-size: 0.9rem;
-      opacity: 0.8;
+    button:active { background: #222; }
+
+    .question {
+      font-size: 22px;
+      line-height: 1.45;
+      margin: 0 0 18px 0;
+      letter-spacing: 0.2px;
     }
   </style>
 </head>
+
 <body>
-  <div class="container">
-    <h1>Reset PWA</h1>
-    <p>オフライン対応のプログレッシブウェブアプリ</p>
-    <button onclick="installApp()">アプリをインストール</button>
-    <div class="status" id="status"></div>
+
+  <!-- 起動（初回のみ表示） -->
+  <div id="start" class="screen active">
+    <p class="lead">今の反応、考えたか。</p>
+    <button onclick="startFlow()">続ける</button>
   </div>
 
-  <script>
-    let deferredPrompt;
+  <!-- 分類（カテゴリ選択あり） -->
+  <div id="category" class="screen">
+    <button onclick="selectCategory('work')">仕事</button>
+    <button onclick="selectCategory('relation')">人</button>
+    <button onclick="selectCategory('control')">不安</button>
+    <button onclick="selectCategory('self')">自分</button>
+  </div>
 
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      document.querySelector('button').style.display = 'block';
-    });
+  <!-- 問い（1問固定） -->
+  <div id="question" class="screen">
+    <p id="questionText" class="question"></p>
+    <button onclick="end()">終わる</button>
+  </div>
 
-    function installApp() {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choiceResult) => {
-          if (choiceResult.outcome === 'accepted') {
-            console.log('インストール完了');
-          }
-          deferredPrompt = null;
-        });
-      }
-    }
+  <!-- 終了（最小の導線のみ） -->
+  <div id="end" class="screen">
+    <button onclick="go('category')">もう一度</button>
+  </div>
 
-    // Service Workerの登録
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => {
-          console.log('SW登録成功:', reg);
-          document.getElementById('status').textContent = '✓ オフライン対応';
-        })
-        .catch(err => {
-          console.error('SW登録失敗:', err);
-        });
-    }
+<script>
+  // 初期20問（仕事10 / 人間関係6 / 不安3 / 自分1）
+  const questions = {
+    work: [
+      "それは「役割」か、「人格」か。",
+      "それは「期待」か、「契約」か。",
+      "それは「能力」か、「条件」か。",
+      "それは「判断」か、「都合」か。",
+      "それは「比較」か、「基準」か。",
+      "それは「評価」か、「測定」か。",
+      "それは「要求」か、「命令」か。",
+      "それは「結果」か、「途中」か。",
+      "それは「失敗」か、「未完」か。",
+      "それは「指摘」か、「否定」か。"
+    ],
+    relation: [
+      "それは「侵害」か、「期待」か。",
+      "それは「拒否」か、「選択」か。",
+      "それは「支配」か、「主張」か。",
+      "それは「無視」か、「優先順位」か。",
+      "それは「軽視」か、「距離」か。",
+      "それは「理解不足」か、「不一致」か。"
+    ],
+    control: [
+      "それは「備え」か、「支配」か。",
+      "それは「対応」か、「先回り」か。",
+      "それは「管理」か、「固執」か。"
+    ],
+    self: [
+      "それは「現実」か、「期待」か。"
+    ]
+  };
 
-    // デバイスオンライン状態の表示
-    window.addEventListener('online', () => {
-      console.log('オンラインになりました');
-    });
-    window.addEventListener('offline', () => {
-      console.log('オフラインになりました');
-    });
-  </script>
+  function go(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function startFlow() {
+    const seen = localStorage.getItem('seen_start');
+    if (!seen) localStorage.setItem('seen_start', '1');
+    go('category');
+  }
+
+  // 2回目以降はカテゴリへ直行（初回文は初回だけ）
+  window.addEventListener('load', () => {
+    const seen = localStorage.getItem('seen_start');
+    if (seen) go('category');
+  });
+
+  function selectCategory(cat) {
+    const pool = questions[cat] ?? [];
+    const q = pool[Math.floor(Math.random() * pool.length)];
+    document.getElementById('questionText').innerText = q;
+
+    // 触覚（弱・問表示時1回）※音なし
+    if (navigator.vibrate) navigator.vibrate(20);
+
+    go('question');
+  }
+
+  function end() {
+    go('end');
+  }
+
+  // Service Worker 登録（PWA）
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+</script>
+
 </body>
 </html>
