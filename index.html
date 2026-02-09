@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset PWA</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#007bff">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+    .container {
+      text-align: center;
+      padding: 2rem;
+      background: rgba(0,0,0,0.2);
+      border-radius: 20px;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    p {
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+      opacity: 0.9;
+    }
+    button {
+      background: #fff;
+      color: #667eea;
+      border: none;
+      padding: 1rem 2rem;
+      font-size: 1rem;
+      border-radius: 50px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: scale(1.05);
+    }
+    button:active {
+      transform: scale(0.95);
+    }
+    .status {
+      margin-top: 2rem;
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Reset PWA</h1>
+    <p>オフライン対応のプログレッシブウェブアプリ</p>
+    <button onclick="installApp()">アプリをインストール</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    let deferredPrompt;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.querySelector('button').style.display = 'block';
+    });
+
+    function installApp() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('インストール完了');
+          }
+          deferredPrompt = null;
+        });
+      }
+    }
+
+    // Service Workerの登録
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => {
+          console.log('SW登録成功:', reg);
+          document.getElementById('status').textContent = '✓ オフライン対応';
+        })
+        .catch(err => {
+          console.error('SW登録失敗:', err);
+        });
+    }
+
+    // デバイスオンライン状態の表示
+    window.addEventListener('online', () => {
+      console.log('オンラインになりました');
+    });
+    window.addEventListener('offline', () => {
+      console.log('オフラインになりました');
+    });
+  </script>
+</body>
+</html>
