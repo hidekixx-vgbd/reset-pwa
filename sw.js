@@ -1,70 +1,44 @@
-const CACHE_NAME = 'reset-v1';
+const CACHE_NAME = "reset-v3"; // ←更新のたびに v を上げる
 const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json'
+  "/reset-pwa/",
+  "/reset-pwa/index.html",
+  "/reset-pwa/manifest.json",
+  "/reset-pwa/sw.js",
+  "/reset-pwa/icon-192.png",
+  "/reset-pwa/icon-512.png"
 ];
 
-// インストール時
-self.addEventListener('install', (event) => {
-  console.log('SW: install event');
+self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('キャッシュを作成:', CACHE_NAME);
-      return cache.addAll(ASSETS);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
   self.skipWaiting();
 });
 
-// アクティベーション時
-self.addEventListener('activate', (event) => {
-  console.log('SW: activate event');
+self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('古いキャッシュを削除:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
   );
   self.clients.claim();
 });
 
-// フェッチイベント
-self.addEventListener('fetch', (event) => {
-  // GETリクエストのみキャッシュ
-  if (event.request.method !== 'GET') {
-    return;
-  }
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+
+  // GET以外は無視
+  if (req.method !== "GET") return;
+
+  const url = new URL(req.url);
+
+  // http/https 以外（chrome-extension: など）は無視
+  if (url.protocol !== "http:" && url.protocol !== "https:") return;
+
+  // 別オリジンも無視（拡張機能や外部リソース等）
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      if (response) {
-        return response;
-      }
-
-      return fetch(event.request).then((response) => {
-        // ネットワークエラーの場合はキャッシュから返す
-        if (!response || response.status !== 200 || response.type === 'error') {
-          return response;
-        }
-
-        // 成功時はキャッシュに保存
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseClone);
-        });
-
-        return response;
-      }).catch(() => {
-        // ネットワークエラー時はキャッシュから返す
-        return caches.match(event.request);
-      });
-    })
+    caches.match(req).then((cached) => cached || fetch(req))
   );
 });
