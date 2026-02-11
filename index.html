@@ -1,133 +1,149 @@
-const { onRequest } = require("firebase-functions/v2/https");
-const logger = require("firebase-functions/logger");
-const OpenAI = require("openai");
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RESET.</title>
+<style>
+body{
+  margin:0;
+  background:#000;
+  color:#fff;
+  font-family:sans-serif;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+  text-align:center;
+}
+.screen{display:none;width:90%;max-width:420px}
+.screen.active{display:block}
+button{
+  width:100%;
+  padding:14px;
+  margin-top:12px;
+  background:#111;
+  color:#fff;
+  border:1px solid #333;
+  border-radius:8px;
+}
+input{
+  width:100%;
+  padding:12px;
+  margin-top:12px;
+  background:#111;
+  color:#fff;
+  border:1px solid #333;
+  border-radius:8px;
+}
+.big{font-size:20px;line-height:1.5}
+</style>
+</head>
+<body>
 
-// GitHub Pages のオリジン（必要ならあなたのドメインに絞る）
-const ALLOWED_ORIGINS = new Set([
-  "https://hidekixx-vgbd.github.io",
-]);
+<div id="category" class="screen active">
+  <button onclick="selectCategory('work')">仕事</button>
+  <button onclick="selectCategory('relation')">人</button>
+  <button onclick="selectCategory('control')">不安</button>
+  <button onclick="selectCategory('self')">自分</button>
+</div>
 
-const ZEN_TYPES = new Set(["dualism", "attachment", "impermanence"]);
+<div id="input" class="screen">
+  <input id="context" placeholder="何が起きた？（任意）">
+  <button onclick="selectEmotion('怒り')">怒り</button>
+  <button onclick="selectEmotion('焦り')">焦り</button>
+  <button onclick="selectEmotion('不安')">不安</button>
+  <button onclick="selectEmotion('苛立ち')">苛立ち</button>
+  <button onclick="selectEmotion('落胆')">落胆</button>
+</div>
 
-// 2nd gen: cors オプションが使える（ただし細かい制御は自前が確実）
-exports.classify = onRequest(
-  {
-    region: "asia-northeast1",
-    secrets: ["OPENAI_API_KEY"],
-  },
-  async (req, res) => {
-    // --- CORS ---
-    const origin = req.headers.origin || "";
-    if (ALLOWED_ORIGINS.has(origin)) {
-      res.set("Access-Control-Allow-Origin", origin);
-    }
-    res.set("Vary", "Origin");
-    res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
+<div id="zen" class="screen">
+  <p id="zenText" class="big"></p>
+</div>
 
-    if (req.method === "OPTIONS") return res.status(204).send("");
-    if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
+<div id="action" class="screen">
+  <p id="actionText" class="big"></p>
+  <button onclick="restart()">終わる</button>
+</div>
 
-    // --- 入力 ---
-    const { category, context, emotion } = req.body || {};
-    if (!category || !emotion) {
-      return res.status(400).json({ error: "category and emotion are required" });
-    }
+<script>
 
-    // --- OpenAI ---
-    try {
-      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let state={
+  category:null,
+  context:"",
+  emotion:null,
+  zenType:null
+};
 
-      // モデルは後で差し替え可能。最新のモデル指定は公式ガイドに従う。 :contentReference[oaicite:4]{index=4}
-      const MODEL = process.env.OPENAI_MODEL || "gpt-5.2";
+const ZEN={
+  dualism:"いま、評価の二元に引き寄せられている可能性。",
+  attachment:"いま、結果への執着が強まっている可能性。",
+  impermanence:"いま、変化を固定しようとしている可能性。"
+};
 
-      const prompt = [
-        "以下の入力を禅の3つの型のどれかに分類してください。",
-        "",
-        "選べる値は次の3つだけ：dualism, attachment, impermanence",
-        "説明や理由は不要。出力は値1つだけ。",
-        "",
-        `カテゴリ: ${String(category)}`,
-        `状況: ${String(context || "")}`,
-        `感情: ${String(emotion)}`,
-      ].join("\n");
+const ACTIONS=[
+  "何もしない。",
+  "言葉にしない。",
+  "触らない。",
+  "席を立つ。",
+  "決めない。",
+  "離す。",
+  "置いておく。",
+  "画面を閉じる。",
+  "手を止める。",
+  "見ない。"
+];
 
-      const r = await client.responses.create({
-        model: MODEL,
-        input: prompt,
-        // 1語だけ返させる（暴れ防止）
-        max_output_tokens: 16,
-      });
-
-      // OpenAI SDKの簡易テキスト取り出し（環境によりフィールド差が出る場合があるので保守的に）
-      const text =
-        (r.output_text && String(r.output_text).trim()) ||
-        "";
-
-      const zen_type = text.toLowerCase().match(/dualism|attachment|impermanence/)?.[0] || "attachment";
-
-      // フェイルセーフ
-      const finalType = ZEN_TYPES.has(zen_type) ? zen_type : "attachment";
-
-      return res.status(200).json({ zen_type: finalType });
-    } catch (e) {
-      logger.error(e);
-      // フォールバック（安全側）
-      return res.status(200).json({ zen_type: "attachment" });
-    }
-  }
-btnNext.addEventListener("click", async () => {
-  if (!state.session.emotion || !state.session.category) return;
-
-  show("ZEN");
-  zenText.textContent = "…";
-
-  // ローカル分類
-  const zenType = classifyZenTypeLocal({
-    category: state.session.category,
-    context: state.session.contextText,
-    emotion: state.session.emotion
-  });
-
-  state.session.zenType = zenType;
-  zenText.textContent = ZEN_COPY[zenType];
-
-  await sleep(900);
-
-  state.session.action = pickRandom(ACTIONS);
-  if (navigator.vibrate) navigator.vibrate(20);
-
-  zenText2.textContent = ZEN_COPY[state.session.zenType];
-  actionText.textContent = state.session.action;
-  show("ACTION");
-});
-
-function classifyZenTypeLocal({ category, context, emotion }) {
-  const t = `${context || ""}`.toLowerCase();
-  const has = (...words) => words.some(w => t.includes(w));
-
-  const dualismScore =
-    (emotion === "怒り" ? 1 : 0) +
-    (emotion === "苛立ち" ? 1 : 0) +
-    (category === "work" ? 1 : 0) +
-    (category === "relation" ? 1 : 0) +
-    (has("評価", "否定", "ミス", "正しい", "間違い", "比較", "負け", "勝ち", "バカ", "見下") ? 2 : 0);
-
-  const attachmentScore =
-    (emotion === "不安" ? 1 : 0) +
-    (emotion === "焦り" ? 1 : 0) +
-    (category === "control" ? 2 : 0) +
-    (has("思い通り", "コントロール", "期待", "ちゃんと", "すべき", "予定", "確認", "返信", "管理", "絶対") ? 2 : 0);
-
-  const impermanenceScore =
-    (emotion === "不安" ? 1 : 0) +
-    (emotion === "落胆" ? 1 : 0) +
-    (has("先が見えない", "どうなる", "不確実", "変化", "急", "予定変更", "終わり", "このまま") ? 2 : 0);
-
-  const max = Math.max(dualismScore, attachmentScore, impermanenceScore);
-  if (max === dualismScore && dualismScore > attachmentScore && dualismScore > impermanenceScore) return "dualism";
-  if (max === impermanenceScore && impermanenceScore > dualismScore && impermanenceScore > attachmentScore) return "impermanence";
-  return "attachment";
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
 }
 
-);
+function selectCategory(cat){
+  state.category=cat;
+  show("input");
+}
+
+function selectEmotion(em){
+  state.emotion=em;
+  state.context=document.getElementById("context").value;
+  classify();
+}
+
+function classify(){
+  const text=(state.context||"").toLowerCase();
+
+  let dual=0, attach=0, imper=0;
+
+  if(state.emotion==="怒り"||state.emotion==="苛立ち") dual++;
+  if(state.emotion==="不安"||state.emotion==="焦り") attach++;
+  if(state.emotion==="落胆") imper++;
+
+  if(text.includes("評価")||text.includes("否定")) dual+=2;
+  if(text.includes("思い通り")||text.includes("期待")) attach+=2;
+  if(text.includes("変化")||text.includes("先が見えない")) imper+=2;
+
+  const max=Math.max(dual,attach,imper);
+  if(max===dual) state.zenType="dualism";
+  else if(max===imper) state.zenType="impermanence";
+  else state.zenType="attachment";
+
+  document.getElementById("zenText").innerText=ZEN[state.zenType];
+  show("zen");
+
+  setTimeout(()=>{
+    const action=ACTIONS[Math.floor(Math.random()*ACTIONS.length)];
+    document.getElementById("actionText").innerText=action;
+    show("action");
+  },1000);
+}
+
+function restart(){
+  state={category:null,context:"",emotion:null,zenType:null};
+  document.getElementById("context").value="";
+  show("category");
+}
+
+</script>
+</body>
+</html>
