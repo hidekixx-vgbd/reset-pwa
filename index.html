@@ -4,41 +4,66 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RESET.</title>
+
 <style>
 body{
   margin:0;
-  background:#000;
+  background:#0a0a0a;
   color:#fff;
-  font-family:sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   display:flex;
   justify-content:center;
   align-items:center;
   height:100vh;
   text-align:center;
 }
-.screen{display:none;width:90%;max-width:420px}
-.screen.active{display:block}
+
+.screen{
+  display:none;
+  width:90%;
+  max-width:420px;
+  opacity:0;
+  transition:opacity 0.4s ease;
+}
+
+.screen.active{
+  display:block;
+  opacity:1;
+}
+
 button{
   width:100%;
-  padding:14px;
-  margin-top:12px;
-  background:#111;
+  padding:18px 0;
+  margin-top:16px;
+  background:transparent;
+  border:none;
+  border-bottom:1px solid #222;
   color:#fff;
-  border:1px solid #333;
-  border-radius:8px;
+  font-size:18px;
+  letter-spacing:1px;
 }
+
 input{
   width:100%;
-  padding:12px;
-  margin-top:12px;
-  background:#111;
+  padding:16px;
+  margin-top:20px;
+  background:transparent;
   color:#fff;
-  border:1px solid #333;
-  border-radius:8px;
+  border:none;
+  border-bottom:1px solid #222;
+  font-size:16px;
 }
-.big{font-size:20px;line-height:1.5}
+
+.big{
+  font-size:22px;
+  line-height:1.8;
+  letter-spacing:0.5px;
+  margin-top:40px;
+  white-space:pre-line;
+}
 </style>
 </head>
+
 <body>
 
 <div id="category" class="screen active">
@@ -76,9 +101,9 @@ let state={
 };
 
 const ZEN={
-  dualism:"いま、評価の二元に引き寄せられている可能性。",
-  attachment:"いま、結果への執着が強まっている可能性。",
-  impermanence:"いま、変化を固定しようとしている可能性。"
+  dualism:"いま、評価の二元に\n引き寄せられている可能性。",
+  attachment:"いま、結果への執着が\n強まっている可能性。",
+  impermanence:"いま、変化を固定しようとしている\n可能性。"
 };
 
 const ACTIONS=[
@@ -95,8 +120,11 @@ const ACTIONS=[
 ];
 
 function show(id){
-  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
+  document.querySelectorAll(".screen").forEach(s=>{
+    s.classList.remove("active");
+  });
+  const target=document.getElementById(id);
+  target.classList.add("active");
 }
 
 function selectCategory(cat){
@@ -119,11 +147,12 @@ function classify(){
   if(state.emotion==="不安"||state.emotion==="焦り") attach++;
   if(state.emotion==="落胆") imper++;
 
-  if(text.includes("評価")||text.includes("否定")) dual+=2;
-  if(text.includes("思い通り")||text.includes("期待")) attach+=2;
-  if(text.includes("変化")||text.includes("先が見えない")) imper+=2;
+  if(text.includes("評価")||text.includes("否定")||text.includes("比較")) dual+=2;
+  if(text.includes("思い通り")||text.includes("期待")||text.includes("コントロール")) attach+=2;
+  if(text.includes("変化")||text.includes("先が見えない")||text.includes("どうなる")) imper+=2;
 
   const max=Math.max(dual,attach,imper);
+
   if(max===dual) state.zenType="dualism";
   else if(max===imper) state.zenType="impermanence";
   else state.zenType="attachment";
@@ -133,7 +162,7 @@ function classify(){
 
   setTimeout(()=>{
     const action=ACTIONS[Math.floor(Math.random()*ACTIONS.length)];
-    document.getElementById("actionText").innerText=action;
+    document.getElementById("actionText").innerText="\n\n"+action;
     show("action");
   },1000);
 }
